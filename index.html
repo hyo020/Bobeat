@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>같이 밥먹자!</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:#f7f3ed;color:#302a27}
+button,input{font:inherit}
+button{border:0;border-radius:14px;padding:11px 16px;background:#302a27;color:white;cursor:pointer}
+button.secondary{background:#e7dfd5;color:#302a27}
+button:disabled{opacity:.45;cursor:not-allowed}
+.wrap{max-width:1000px;margin:auto;padding:18px}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.header-actions{display:flex;align-items:center;gap:8px}.share-btn{padding:8px 12px;border-radius:12px}
+h1{margin:0;font-size:25px}
+.status{font-size:13px;padding:7px 11px;border-radius:999px;background:#e7dfd5}
+.card{background:white;border:1px solid #e3dbd1;border-radius:22px;padding:16px;box-shadow:0 5px 20px #00000008}
+#lobby{max-width:600px;margin:70px auto}
+#game{display:none}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input[type=text]{width:100%;padding:12px;border:1px solid #d7cec4;border-radius:12px;outline:none}
+.gamearea{position:relative;height:560px;border-radius:25px;overflow:hidden;background:#fff url('table_background.png') center/100% 100% no-repeat;aspect-ratio:2360/1640;height:auto;border:1px solid #ddd1c4}
+.scene{position:absolute;inset:0}
+.table{display:none;position:absolute;left:50%;top:58%;transform:translate(-50%,-50%);width:72%;height:34%;border-radius:50%;background:#c7a77f;border:8px solid #a88661;box-shadow:0 12px 25px #0002}
+.plate{display:none;position:absolute;top:44%;width:18%;height:15%;border-radius:50%;background:#fff;border:5px solid #d8d8d8}
+.plate.left{left:23%}.plate.right{right:23%}
+.food{position:absolute;top:62%;font-size:46px;line-height:1;transform:translate(-50%,-50%);z-index:4;transition:.25s}
+.food.left{left:41.3%}.food.right{left:61.3%}
+.char{position:absolute;top:57%;width:15%;height:auto;z-index:5;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%)}
+.char.left{left:31.1%}.char.right{left:75.4%;right:auto}
+.char canvas{display:block;width:100%;height:auto;aspect-ratio:1/1}
+.char canvas{max-width:100%;max-height:100%;background:transparent}
+.name{position:absolute;top:-4px;background:#fff;padding:4px 9px;border-radius:999px;font-size:13px;border:1px solid #ddd}
+.bubble{position:absolute;top:42px;background:white;border:1px solid #ddd;padding:8px 12px;border-radius:15px;display:none;z-index:10}
+.controls{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.panel h2{font-size:17px;margin:0 0 10px}
+.emoji-grid{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}
+.emoji{background:#f0ebe5;color:#302a27;font-size:25px;padding:7px 10px;border-radius:12px}
+.emoji.selected{outline:3px solid #302a27}
+.draw{display:grid;grid-template-columns:1fr auto;gap:10px}
+#drawCanvas{width:100%;height:240px;border:1px dashed #bfb4a8;border-radius:15px;background:#fff;touch-action:none}
+.small{font-size:12px;color:#756b63;line-height:1.5}
+#shareBox{display:none;margin-top:12px}
+.link{font-size:12px;word-break:break-all;background:#f4efe9;padding:9px;border-radius:10px}
+@media(max-width:700px){
+ .controls{grid-template-columns:1fr}
+ .food{font-size:clamp(32px,8vw,46px)}
+ .char{width:15%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>🍚 같이 밥먹자!</h1><div class="header-actions"><button id="gameShareBtn" class="secondary share-btn" style="display:none">🔗 친구 초대</button><div id="status" class="status">대기 중</div></div></header>
+
+<section id="lobby" class="card">
+<h2>친구랑 밥 먹기</h2>
+<p class="small">캐릭터는 직접 그리고, 음식은 이름 + 이모지로 자유롭게 만들 수 있어.</p>
+<div class="row">
+<input id="nameInput" type="text" maxlength="12" placeholder="내 이름">
+<button id="createBtn">방 만들기</button>
+</div>
+<div id="shareBox">
+<p class="small">이 링크를 친구에게 보내면 같은 방으로 들어와!</p>
+<div id="shareLink" class="link"></div>
+<div class="row" style="margin-top:8px"><button id="shareBtn">📤 초대 링크 공유</button><button id="copyBtn" class="secondary">링크 복사</button></div>
+</div>
+<hr style="border:0;border-top:1px solid #eee;margin:18px 0">
+<div id="joinBox" style="display:none">
+<p>친구가 만든 방 링크로 들어왔어.</p>
+<button id="joinBtn">방 입장하기</button>
+</div>
+</section>
+
+<div id="inviteModal" style="display:none;position:fixed;inset:0;background:#0006;z-index:100;align-items:center;justify-content:center;padding:18px">
+  <div class="card" style="width:min(520px,100%);box-shadow:0 15px 45px #0004">
+    <h2 style="margin-top:0">🔗 친구 초대</h2>
+    <p class="small">아래 초대 링크를 친구에게 보내면 같은 방으로 들어올 수 있어!</p>
+    <div id="modalShareLink" class="link"></div>
+    <div class="row" style="margin-top:10px"><button id="modalShareBtn">📤 공유하기</button><button id="modalCopyBtn" class="secondary">링크 복사</button><button id="closeModal" class="secondary">닫기</button></div>
+  </div>
+</div>
+
+<section id="game">
+<div class="gamearea">
+<div class="scene">
+<div class="table"></div>
+<div class="plate left"></div><div class="plate right"></div>
+<div id="foodLeft" class="food left"></div><div id="foodRight" class="food right"></div>
+<div class="char left"><div id="nameLeft" class="name"></div><div id="bubbleLeft" class="bubble"></div><canvas id="charLeft" width="320" height="320"></canvas></div>
+<div class="char right"><div id="nameRight" class="name"></div><div id="bubbleRight" class="bubble"></div><canvas id="charRight" width="320" height="320"></canvas></div>
+</div>
+</div>
+
+<div class="controls">
+<div class="card panel">
+<h2>🎨 내 캐릭터 그리기</h2>
+<div class="draw"><canvas id="drawCanvas" width="600" height="360"></canvas><div class="row" style="align-content:start"><button id="clearDraw" class="secondary">지우기</button><button id="saveDraw">적용</button></div></div>
+<p class="small">손가락/펜으로 그리면 돼. 적용하면 친구 화면에도 보여.</p>
+</div>
+
+<div class="card panel">
+<h2>🍙 음식 만들기</h2>
+<input id="foodName" type="text" maxlength="20" placeholder="음식 이름 (예: 떡볶이)">
+<div class="emoji-grid" id="emojiGrid"></div>
+<div class="row"><button id="addFood">식탁에 놓기</button><button id="eatBtn" class="secondary">냠냠 먹기</button><button id="stealBtn" class="secondary">😈 뺏어먹기</button></div>
+<p class="small">음식 이름은 자유롭게 쓰고, 아래 이모지를 골라 음식 그림처럼 사용할 수 있어. 친구 음식은 😈 뺏어먹기도 가능!</p>
+</div>
+</div>
+</section>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const emojis=["🍚","🍙","🍜","🍝","🍕","🍔","🍣","🍤","🥟","🍗","🥩","🥪","🌭","🍳","🥞","🧇","🍰","🍩","🍪","🍓","🍎","🍉","🍌","🥤","🧋","☕","🍵"];
+const $=id=>document.getElementById(id);
+let peer=null, conn=null, isHost=false, peerReady=false;
+let inviteUrl="";
+let me={name:"",draw:"",food:null,bubble:""};
+let other={name:"친구",draw:"",food:null,bubble:""};
+let selectedEmoji="🍚";
+
+emojis.forEach(e=>{
+ const b=document.createElement("button"); b.className="emoji"; b.textContent=e;
+ b.onclick=()=>{selectedEmoji=e;document.querySelectorAll(".emoji").forEach(x=>x.classList.remove("selected"));b.classList.add("selected")};
+ if(e==="🍚")b.classList.add("selected"); $("emojiGrid").appendChild(b);
+});
+
+function setStatus(t){$("status").textContent=t}
+function showGame(){
+ $("lobby").style.display="none"; $("game").style.display="block";
+ render();
+}
+function render(){
+ if(isHost){
+  $("nameLeft").textContent=me.name; $("nameRight").textContent=other.name||"친구";
+  drawImage($("charLeft"),me.draw); drawImage($("charRight"),other.draw);
+  setFood($("foodLeft"),me.food); setFood($("foodRight"),other.food);
+  $("bubbleLeft").textContent=me.bubble; $("bubbleLeft").style.display=me.bubble?"block":"none";
+  $("bubbleRight").textContent=other.bubble; $("bubbleRight").style.display=other.bubble?"block":"none";
+ }else{
+  $("nameLeft").textContent=other.name||"친구"; $("nameRight").textContent=me.name;
+  drawImage($("charLeft"),other.draw); drawImage($("charRight"),me.draw);
+  setFood($("foodLeft"),other.food); setFood($("foodRight"),me.food);
+  $("bubbleLeft").textContent=other.bubble; $("bubbleLeft").style.display=other.bubble?"block":"none";
+  $("bubbleRight").textContent=me.bubble; $("bubbleRight").style.display=me.bubble?"block":"none";
+ }
+}
+function drawImage(canvas,data){
+ const c=canvas.getContext("2d");c.clearRect(0,0,canvas.width,canvas.height);
+ if(!data)return;
+ const img=new Image();img.onload=()=>{c.drawImage(img,0,0,canvas.width,canvas.height)};img.src=data;
+}
+function setFood(el,f){
+ el.textContent=f?f.emoji:"";
+ el.title=f?f.name:"";
+ el.style.opacity=f?"1":"0";
+}
+function sendState(){
+ if(!conn||!conn.open)return;
+ conn.send({type:"state",name:me.name,draw:me.draw,food:me.food,bubble:me.bubble});
+}
+function updateHostState(){
+ if(!isHost)return;
+ if(conn&&conn.open) conn.send({type:"hostState",state:me});
+ render();
+}
+function setupConn(c){
+ conn=c;
+ c.on("open",()=>{
+   peerReady=true;
+   setStatus(isHost?"친구가 입장했어!":"방에 연결됨");
+   if(isHost) c.send({type:"hostState",state:me});
+   else sendState();
+ });
+ c.on("data",data=>{
+   if(data.type==="state"&&isHost){other={...other,...data};render();c.send({type:"hostState",state:me})}
+   if(data.type==="steal"&&isHost){
+     if(other.food){
+       const stolen=other.food;
+       other.food=null;
+       me.bubble=`${stolen.emoji} 뺏어먹음!`;
+       c.send({type:"hostState",state:me});
+       c.send({type:"stolen",food:stolen});
+       render();
+       setTimeout(()=>{me.bubble="";updateHostState()},900);
+     }
+   }
+   if(data.type==="hostState"&&!isHost){other={...other,...data.state};render()}
+   if(data.type==="stolen"&&!isHost){
+     me.bubble=`${data.food.emoji} 뺏겼다!`;
+     render();
+     setTimeout(()=>{me.bubble="";sendState();render()},900);
+   }
+ });
+ c.on("close",()=>setStatus("친구와 연결이 끊어졌어"));
+ c.on("error",()=>setStatus("연결 오류"));
+}
+
+$("createBtn").onclick=()=>{
+ me.name=$("nameInput").value.trim()||"나";isHost=true;
+ peer=new Peer();
+ peer.on("open",id=>{
+   const url=location.href.split("?")[0]+"?host="+encodeURIComponent(id);
+   inviteUrl=url;
+   $("shareLink").textContent=url;$("shareBox").style.display="block";
+   setStatus("친구를 기다리는 중");
+   $("gameShareBtn").style.display="block";
+   showGame();
+ });
+ peer.on("connection",c=>setupConn(c));
+ peer.on("error",e=>setStatus("방 연결 오류"));
+};
+
+const params=new URLSearchParams(location.search);
+if(params.get("host")){
+ $("joinBox").style.display="block";
+ $("joinBtn").onclick=()=>{
+   me.name=$("nameInput").value.trim()||"친구";
+   const hostId=params.get("host");
+   peer=new Peer();
+   peer.on("open",()=>setupConn(peer.connect(hostId)));
+   peer.on("error",()=>setStatus("방을 찾을 수 없어"));
+ };
+}
+
+async function shareInvite(){
+ const url=inviteUrl||location.href;
+ if(navigator.share){
+   try{await navigator.share({title:"같이 밥먹자!",text:"같이 밥먹자! 내 방으로 들어와 🍚",url});return;}catch(e){}
+ }
+ try{await navigator.clipboard.writeText(url);alert("초대 링크가 복사됐어!");}
+ catch(e){alert("링크를 복사하지 못했어. 아래 링크를 길게 눌러 복사해줘!");}
+}
+function openInvite(){
+ if(!inviteUrl) return;
+ $("modalShareLink").textContent=inviteUrl;
+ $("inviteModal").style.display="flex";
+}
+$("gameShareBtn").onclick=openInvite;
+$("shareBtn").onclick=shareInvite;
+$("modalShareBtn").onclick=shareInvite;
+$("closeModal").onclick=()=>$("inviteModal").style.display="none";
+$("inviteModal").onclick=e=>{if(e.target===e.currentTarget)e.currentTarget.style.display="none"};
+
+$("copyBtn").onclick=async()=>{
+ try{await navigator.clipboard.writeText($("shareLink").textContent);$("copyBtn").textContent="복사됨!";}
+ catch(e){alert("링크를 길게 눌러 복사해줘!");}
+};
+
+const draw=$("drawCanvas"),ctx=draw.getContext("2d");
+ctx.lineWidth=9;ctx.lineCap="round";ctx.lineJoin="round";
+let drawing=false;
+function pos(ev){const r=draw.getBoundingClientRect();const p=ev.touches?ev.touches[0]:ev;return{x:(p.clientX-r.left)*draw.width/r.width,y:(p.clientY-r.top)*draw.height/r.height}}
+function start(ev){drawing=true;const p=pos(ev);ctx.beginPath();ctx.moveTo(p.x,p.y);ev.preventDefault()}
+function move(ev){if(!drawing)return;const p=pos(ev);ctx.lineTo(p.x,p.y);ctx.stroke();ev.preventDefault()}
+function end(){drawing=false}
+draw.addEventListener("pointerdown",start);draw.addEventListener("pointermove",move);draw.addEventListener("pointerup",end);draw.addEventListener("pointerleave",end);
+$("clearDraw").onclick=()=>ctx.clearRect(0,0,draw.width,draw.height);
+$("saveDraw").onclick=()=>{
+ me.draw=draw.toDataURL("image/png");
+ if(isHost)updateHostState();else sendState();
+ render();
+};
+
+$("addFood").onclick=()=>{
+ const n=$("foodName").value.trim()||"이름 없는 음식";
+ me.food={name:n,emoji:selectedEmoji};
+ $("foodName").value="";
+ if(isHost)updateHostState();else sendState(); render();
+};
+$("stealBtn").onclick=()=>{
+ if(!conn||!conn.open){
+   me.bubble="친구가 아직 없어!";
+   render();
+   setTimeout(()=>{me.bubble="";render()},900);
+   return;
+ }
+ if(isHost){
+   if(!other.food){
+     me.bubble="먹을 게 없잖아!";
+   }else{
+     const stolen=other.food;
+     other.food=null;
+     me.bubble=`${stolen.emoji} 뺏어먹음!`;
+     conn.send({type:"steal",food:stolen});
+     conn.send({type:"hostState",state:me});
+     render();
+   }
+ }else{
+   conn.send({type:"steal"});
+   me.bubble="냠!";
+   render();
+ }
+ setTimeout(()=>{me.bubble="";if(isHost)updateHostState();else sendState();render()},900);
+};
+
+$("eatBtn").onclick=()=>{
+ if(!me.food)return;
+ me.bubble="냠냠!";
+ if(isHost)updateHostState();else sendState();render();
+ setTimeout(()=>{me.bubble="";if(isHost)updateHostState();else sendState();render()},900);
+};
+</script>
+</body>
+</html>
